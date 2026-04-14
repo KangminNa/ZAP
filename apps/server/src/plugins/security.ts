@@ -3,6 +3,7 @@ import type { FastifyReply } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import compress from '@fastify/compress';
+import { isDomainError } from '../domain/errors';
 
 declare module 'fastify' {
   interface FastifyReply {
@@ -59,9 +60,20 @@ export const securityPlugin = fp(async (app) => {
   });
 
   // ── 에러 핸들러 ──────────────────────────────────────────────
-  // 프로덕션에선 스택/내부 메시지를 외부에 흘리지 않음.
+  // 1) DomainError → 코드·메시지·상태 그대로 매핑 (클라이언트가 code로 분기)
+  // 2) 그 외 에러 → 프로덕션에선 스택/내부 메시지 숨김
   app.setErrorHandler((err, req, reply) => {
     req.log.error({ err }, 'request error');
+
+    if (isDomainError(err)) {
+      reply.status(err.statusCode).send({
+        code: err.code,
+        message: err.message,
+        statusCode: err.statusCode,
+      });
+      return;
+    }
+
     const statusCode = err.statusCode ?? 500;
     const isClientError = statusCode >= 400 && statusCode < 500;
     const message =
