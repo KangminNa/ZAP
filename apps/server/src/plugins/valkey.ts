@@ -8,7 +8,7 @@ declare module 'fastify' {
 }
 
 export const valkeyPlugin = fp(async (app) => {
-  const client = new Redis(process.env.VALKEY_URL ?? 'redis://localhost:6379', {
+  const client = new Redis(app.config.valkey.url, {
     maxRetriesPerRequest: 3,
     enableReadyCheck: true,
   });

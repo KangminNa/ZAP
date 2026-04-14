@@ -1,30 +1,28 @@
 import Fastify from 'fastify';
-import cors from '@fastify/cors';
+import { Config } from './config';
+import { securityPlugin } from './plugins/security';
 import { valkeyPlugin } from './plugins/valkey';
 import { minioPlugin } from './plugins/minio';
 import { healthRoutes } from './routes/health';
 
-const PORT = Number(process.env.PORT ?? 3000);
-const HOST = process.env.HOST ?? '0.0.0.0';
+const config = Config.load();
 
 const app = Fastify({
-  logger:
-    process.env.NODE_ENV === 'production'
-      ? true
-      : { transport: { target: 'pino-pretty' } },
+  logger: config.isProduction
+    ? { level: config.logLevel }
+    : { level: config.logLevel, transport: { target: 'pino-pretty' } },
+  trustProxy: config.trustProxy,
 });
 
-await app.register(cors, {
-  origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
-  credentials: true,
-});
+app.decorate('config', config);
 
+await app.register(securityPlugin);
 await app.register(valkeyPlugin);
 await app.register(minioPlugin);
 await app.register(healthRoutes);
 
 try {
-  await app.listen({ port: PORT, host: HOST });
+  await app.listen({ port: config.port, host: config.host });
 } catch (err) {
   app.log.error(err);
   process.exit(1);

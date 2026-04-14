@@ -10,27 +10,25 @@ declare module 'fastify' {
 }
 
 export const minioPlugin = fp(async (app) => {
-  const accessKey = process.env.MINIO_ACCESS_KEY ?? 'zap_admin';
-  const secretKey = process.env.MINIO_SECRET_KEY ?? 'zap_secret_change_me';
-  const bucket = process.env.MINIO_BUCKET ?? 'zap-sessions';
+  const { minio } = app.config;
 
   const internal = new MinioClient({
-    endPoint: process.env.MINIO_ENDPOINT ?? 'localhost',
-    port: Number(process.env.MINIO_PORT ?? 9000),
-    useSSL: process.env.MINIO_USE_SSL === 'true',
-    accessKey,
-    secretKey,
+    endPoint: minio.endPoint,
+    port: minio.port,
+    useSSL: minio.useSSL,
+    accessKey: minio.accessKey,
+    secretKey: minio.secretKey,
   });
 
   const publicClient = new MinioClient({
-    endPoint: process.env.MINIO_PUBLIC_ENDPOINT ?? 'localhost',
-    port: Number(process.env.MINIO_PUBLIC_PORT ?? 9000),
-    useSSL: process.env.MINIO_PUBLIC_USE_SSL === 'true',
-    accessKey,
-    secretKey,
+    endPoint: minio.public.endPoint,
+    port: minio.public.port,
+    useSSL: minio.public.useSSL,
+    accessKey: minio.accessKey,
+    secretKey: minio.secretKey,
   });
 
   app.decorate('minio', internal);
   app.decorate('minioPublic', publicClient);
-  app.decorate('minioBucket', bucket);
+  app.decorate('minioBucket', minio.bucket);
 });

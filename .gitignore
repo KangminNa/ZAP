@@ -9,9 +9,9 @@ coverage
 *.tsbuildinfo
 
 .env
-.env.local
-.env.*.local
+.env.*
 !.env.example
+!.env.*.example
 
 apps/*/dist
 apps/*/.vite
