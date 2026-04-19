@@ -1,0 +1,104 @@
+services:
+  # ── 프론트엔드 (nginx + SPA) ─────────────────────────────────
+  client:
+    build:
+      context: .
+      dockerfile: apps/client/Dockerfile
+    container_name: zap-client
+    ports:
+      - "${CLIENT_PORT:-3080}:80"
+    restart: unless-stopped
+
+  # ── 백엔드 (Fastify + WebSocket) ───────────────────────────
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    container_name: zap-server
+    depends_on:
+      minio:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      LOG_LEVEL: info
+      TRUST_PROXY: "true"
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
+      VALKEY_URL: redis://valkey:6379
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-zap_admin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-zap_secret_change_me}
+      MINIO_BUCKET: zap-sessions
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-minio}
+      MINIO_PUBLIC_PORT: ${MINIO_PUBLIC_PORT:-9000}
+      MINIO_PUBLIC_USE_SSL: ${MINIO_PUBLIC_USE_SSL:-false}
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required}
+    ports:
+      - "${SERVER_PORT:-3000}:3000"
+    restart: unless-stopped
+
+  # ── MinIO (오브젝트 스토리지) ───────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: zap-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-zap_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-zap_secret_change_me}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    expose:
+      - "9000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── MinIO 초기화 ─────────────────────────────────────────────
+  minio-init:
+    image: minio/mc:latest
+    container_name: zap-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-zap_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-zap_secret_change_me}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set zap http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD;
+      mc mb --ignore-existing zap/zap-sessions;
+      mc ilm add --expiry-days 1 zap/zap-sessions;
+      mc anonymous set none zap/zap-sessions;
+      echo 'MinIO initialized';
+      "
+    restart: on-failure
+
+  # ── Valkey (세션 캐시) ────────────────────────────────────────
+  valkey:
+    image: valkey/valkey:latest
+    container_name: zap-valkey
+    command: valkey-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - valkey_data:/data
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  minio_data:
+  valkey_data:
