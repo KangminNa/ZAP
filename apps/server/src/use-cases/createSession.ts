@@ -1,0 +1,50 @@
+import { nanoid } from 'nanoid';
+import { SessionId, TTL, NetworkPrefix, type CreateSessionRequest } from '@zap/shared';
+import { Session } from '../domain/Session';
+import { FileSlot } from '../domain/FileSlot';
+import type { SessionRepository } from '../ports/SessionRepository';
+import type { ObjectStorage } from '../ports/ObjectStorage';
+import type { Clock } from '../ports/Clock';
+
+export interface CreateSessionDeps {
+  sessionRepo: SessionRepository;
+  objectStorage: ObjectStorage;
+  clock: Clock;
+}
+
+export interface CreateSessionResult {
+  session: Session;
+  uploadUrls: string[];
+}
+
+const UPLOAD_URL_BUFFER_SECONDS = 600;
+
+export async function createSession(
+  deps: CreateSessionDeps,
+  input: CreateSessionRequest,
+  senderDeviceId: string,
+  senderIp: string,
+): Promise<CreateSessionResult> {
+  const ttl = TTL.parse(input.ttl);
+  const networkPrefix = NetworkPrefix.fromIp(senderIp);
+  const id = SessionId.parse(`zap_${nanoid(8)}`);
+  const files = input.files.map((f, i) => FileSlot.fromDto(i, f));
+
+  const session = Session.create({
+    id,
+    senderDeviceId,
+    networkPrefix,
+    files,
+    ttl,
+    now: deps.clock.now(),
+  });
+
+  const uploadUrls = await deps.objectStorage.issueUploadUrls(
+    session,
+    ttl.seconds + UPLOAD_URL_BUFFER_SECONDS,
+  );
+
+  await deps.sessionRepo.save(session, ttl.seconds);
+
+  return { session, uploadUrls };
+}
