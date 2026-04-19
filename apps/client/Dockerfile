@@ -7,7 +7,7 @@ COPY apps/client/package.json apps/client/
 RUN pnpm install --frozen-lockfile
 COPY packages/shared/ packages/shared/
 COPY apps/client/ apps/client/
-RUN pnpm --filter @zap/client build
+RUN pnpm --filter @zap/shared build && pnpm --filter @zap/client build
 
 FROM nginx:alpine AS runner
 COPY --from=builder /app/apps/client/dist /usr/share/nginx/html
