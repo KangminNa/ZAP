@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { DeviceList } from './features/discovery/ui/DeviceList';
 import { DropZone } from './features/send/ui/DropZone';
 import { TTLPicker } from './features/send/ui/TTLPicker';
@@ -6,15 +6,69 @@ import { TransferProgress } from './features/send/ui/TransferProgress';
 import { ReceiverPanel } from './features/receive/ui/ReceiverCard';
 import { useSendStore } from './features/send/model/sendStore';
 import { useDiscoveryStore } from './features/discovery/model/discoveryStore';
+import { useReceiveStore } from './features/receive/model/receiveStore';
+import { wsClient, api, uploadFiles, createUploadController } from './services';
 
 type Tab = 'send' | 'receive';
 
-function SendView() {
-  const { phase, files } = useSendStore();
-  const selectedDeviceId = useDiscoveryStore((s) => s.selectedDeviceId);
+function useWsConnection() {
+  const setDevices = useDiscoveryStore((s) => s.setDevices);
+  const addTransfer = useReceiveStore((s) => s.addTransfer);
 
-  if (phase === 'uploading' || phase === 'done') {
-    return <TransferProgress />;
+  useEffect(() => {
+    wsClient.on('device:list', (payload) => setDevices(payload.devices));
+    wsClient.on('transfer:ready', (payload) => addTransfer(payload));
+    wsClient.connect();
+    return () => wsClient.disconnect();
+  }, [setDevices, addTransfer]);
+}
+
+function SendView() {
+  const store = useSendStore();
+  const selectedDeviceId = useDiscoveryStore((s) => s.selectedDeviceId);
+  const [sending, setSending] = useState(false);
+
+  const handleSend = useCallback(async () => {
+    if (store.files.length === 0 || !selectedDeviceId || sending) return;
+    setSending(true);
+
+    try {
+      const res = await api.createSession(store.files, store.ttl);
+      store.startUpload(res.sessionId, res.presignedUrls);
+
+      const controller = createUploadController();
+      await uploadFiles({
+        files: store.files,
+        presignedUrls: res.presignedUrls,
+        signal: controller.signal,
+        onProgress: async (uploaded) => {
+          store.updateProgress(uploaded);
+          await api.reportProgress(res.sessionId, uploaded).catch(() => {});
+        },
+      });
+
+      store.complete();
+    } catch (err) {
+      console.error('send failed', err);
+    } finally {
+      setSending(false);
+    }
+  }, [store, selectedDeviceId, sending]);
+
+  if (store.phase === 'uploading' || store.phase === 'done') {
+    return (
+      <div className="space-y-4">
+        <TransferProgress />
+        {store.phase === 'done' && (
+          <button
+            onClick={store.reset}
+            className="w-full py-3 rounded-xl bg-stone-200 text-stone-700 font-medium hover:bg-stone-300 transition-colors"
+          >
+            새 전송
+          </button>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -24,10 +78,11 @@ function SendView() {
       <TTLPicker />
 
       <button
-        disabled={files.length === 0 || !selectedDeviceId}
+        disabled={store.files.length === 0 || !selectedDeviceId || sending}
+        onClick={handleSend}
         className="w-full py-4 rounded-xl font-medium text-white transition-colors bg-blue-500 hover:bg-blue-600 disabled:bg-stone-300 disabled:cursor-not-allowed"
       >
-        전송하기
+        {sending ? '준비 중...' : '전송하기'}
       </button>
 
       <p className="text-center text-xs text-stone-400">
@@ -39,6 +94,7 @@ function SendView() {
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('send');
+  useWsConnection();
 
   return (
     <div className="min-h-screen bg-stone-100">

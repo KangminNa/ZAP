@@ -1,8 +1,10 @@
+import { useEffect } from 'react';
 import { FileSize } from '@zap/shared';
 import { Avatar } from '../../../shared/ui/Avatar';
 import { Badge } from '../../../shared/ui/Badge';
 import type { IncomingTransfer } from '../model/receiveStore';
 import { useReceiveStore } from '../model/receiveStore';
+import { wsClient, downloadFiles } from '../../../services';
 
 function ExpiryTimer({ expiresAt }: { expiresAt: string }) {
   const now = Date.now();
@@ -13,8 +15,29 @@ function ExpiryTimer({ expiresAt }: { expiresAt: string }) {
 }
 
 function TransferCard({ transfer }: { transfer: IncomingTransfer }) {
-  const { acceptTransfer, declineTransfer } = useReceiveStore();
+  const { acceptTransfer, declineTransfer, markDone } = useReceiveStore();
   const { sender, fileCount, totalSize, expiresAt, status, sessionId } = transfer;
+
+  const handleAccept = () => {
+    wsClient.send({ event: 'transfer:accept', payload: { sessionId } });
+  };
+
+  const handleDecline = () => {
+    wsClient.send({ event: 'transfer:decline', payload: { sessionId } });
+    declineTransfer(sessionId);
+  };
+
+  useEffect(() => {
+    const handler = (payload: { sessionId: string; presignedUrls: string[] }) => {
+      if (payload.sessionId !== sessionId) return;
+      acceptTransfer(sessionId, payload.presignedUrls);
+
+      const names = payload.presignedUrls.map((_, i) => `file_${i + 1}`);
+      downloadFiles(payload.presignedUrls, names).then(() => markDone(sessionId));
+    };
+    wsClient.on('transfer:complete', handler);
+    return () => wsClient.off('transfer:complete', handler);
+  }, [sessionId, acceptTransfer, markDone]);
 
   return (
     <div className="bg-white rounded-2xl p-5 space-y-4">
@@ -30,13 +53,13 @@ function TransferCard({ transfer }: { transfer: IncomingTransfer }) {
       {status === 'pending' && (
         <div className="flex gap-2">
           <button
-            onClick={() => acceptTransfer(sessionId, [])}
+            onClick={handleAccept}
             className="flex-1 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors"
           >
             저장하기
           </button>
           <button
-            onClick={() => declineTransfer(sessionId)}
+            onClick={handleDecline}
             className="px-6 py-3 bg-stone-100 text-stone-600 rounded-xl font-medium hover:bg-stone-200 transition-colors"
           >
             거절
