@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid';
 import { SessionId, TTL, NetworkPrefix, type CreateSessionRequest } from '@zap/shared';
+import { resolveIp } from '../services/network';
 import { Session } from '../domain/Session';
 import { FileSlot } from '../domain/FileSlot';
 import type { SessionRepository } from '../ports/SessionRepository';
@@ -26,13 +27,14 @@ export async function createSession(
   senderIp: string,
 ): Promise<CreateSessionResult> {
   const ttl = TTL.parse(input.ttl);
-  const networkPrefix = NetworkPrefix.fromIp(senderIp);
-  const id = SessionId.parse(`zap_${nanoid(8)}`);
+  const networkPrefix = NetworkPrefix.fromIp(resolveIp(senderIp));
+  const id = SessionId.parse(`zap_${nanoid(16)}`);
   const files = input.files.map((f, i) => FileSlot.fromDto(i, f));
 
   const session = Session.create({
     id,
     senderDeviceId,
+    targetDeviceId: input.targetDeviceId,
     networkPrefix,
     files,
     ttl,

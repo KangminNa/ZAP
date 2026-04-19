@@ -1,5 +1,6 @@
 import type { WsEvent, WsEventName, WsEventPayload } from '@zap/shared';
 import { getDeviceInfo } from './deviceId';
+import { api } from './apiClient';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Handler<N extends WsEventName = any> = (payload: WsEventPayload<N>) => void;
@@ -13,11 +14,12 @@ class WsClient {
   private backoff = 1000;
   private shouldReconnect = false;
 
-  connect(): void {
+  async connect(): Promise<void> {
     if (this.ws?.readyState === WebSocket.OPEN) return;
     this.shouldReconnect = true;
 
-    const ws = new WebSocket(`${WS_URL}/ws`);
+    const ticket = await api.getWsTicket();
+    const ws = new WebSocket(`${WS_URL}/ws?ticket=${ticket}`);
     this.ws = ws;
 
     ws.onopen = () => {

@@ -4,7 +4,7 @@ import type {
   TTLLabel,
   DomainErrorCode,
 } from '@zap/shared';
-import { getDeviceId } from './deviceId';
+import { getDeviceToken, setDeviceToken } from './deviceId';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
@@ -27,10 +27,13 @@ async function request<T>(
     ...init,
     headers: {
       'Content-Type': 'application/json',
-      'X-Device-Id': getDeviceId(),
+      Authorization: `Bearer ${getDeviceToken()}`,
       ...init?.headers,
     },
   });
+
+  const refreshed = res.headers.get('X-Device-Token-Refresh');
+  if (refreshed) setDeviceToken(refreshed);
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -49,12 +52,14 @@ export const api = {
   createSession(
     files: File[],
     ttl: TTLLabel,
+    targetDeviceId: string,
   ): Promise<CreateSessionResponse> {
     return request('/api/sessions', {
       method: 'POST',
       body: JSON.stringify({
         fileCount: files.length,
         ttl,
+        targetDeviceId,
         files: files.map((f) => ({
           name: f.name,
           size: f.size,
@@ -80,5 +85,12 @@ export const api = {
 
   cancelSession(sessionId: string): Promise<void> {
     return request(`/api/sessions/${sessionId}`, { method: 'DELETE' });
+  },
+
+  async getWsTicket(): Promise<string> {
+    const res = await request<{ ticket: string }>('/api/auth/ws-ticket', {
+      method: 'POST',
+    });
+    return res.ticket;
   },
 };

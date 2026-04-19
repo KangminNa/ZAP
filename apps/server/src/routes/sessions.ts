@@ -4,6 +4,7 @@ import { CreateSessionRequestSchema, SessionId } from '@zap/shared';
 import { SessionNotFound } from '../domain/errors';
 import { createSession } from '../use-cases/createSession';
 import { cancelSession } from '../use-cases/cancelSession';
+import { issueTransferToken } from '../services/auth';
 
 const ProgressBodySchema = z.object({
   uploadedCount: z.number().int().nonnegative(),
@@ -13,13 +14,6 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
   app.post('/api/sessions', async (req, reply) => {
     const body = CreateSessionRequestSchema.parse(req.body);
 
-    const deviceId = req.headers['x-device-id'];
-    if (typeof deviceId !== 'string' || !deviceId) {
-      return reply
-        .status(400)
-        .send({ error: 'X-Device-Id header required', statusCode: 400 });
-    }
-
     const result = await createSession(
       {
         sessionRepo: app.sessionRepo,
@@ -27,14 +21,21 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
         clock: app.clock,
       },
       body,
-      deviceId,
+      req.deviceId,
       req.ip,
+    );
+
+    const transferToken = issueTransferToken(
+      result.session.id,
+      body.targetDeviceId,
+      app.config.auth.secret,
     );
 
     return reply.sensitive().send({
       sessionId: result.session.id,
       presignedUrls: result.uploadUrls,
       expiresAt: result.session.expiresAt.toISOString(),
+      transferToken,
     });
   });
 
@@ -71,7 +72,22 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
       await app.sessionRepo.save(session, remaining);
 
       if (session.status === 'ready') {
-        app.log.info({ sessionId: id }, 'session ready for transfer');
+        const transferToken = issueTransferToken(
+          session.id,
+          session.targetDeviceId,
+          app.config.auth.secret,
+        );
+        await app.eventBus.publishToDevice(session.targetDeviceId, {
+          event: 'transfer:ready',
+          payload: {
+            sessionId: session.id,
+            sender: { id: session.senderDeviceId, name: '', type: 'unknown' },
+            fileCount: session.files.length,
+            totalSize: session.totalSize,
+            expiresAt: session.expiresAt.toISOString(),
+          },
+        });
+        app.log.info({ sessionId: id, transferToken }, 'session ready');
       }
 
       return reply.send({

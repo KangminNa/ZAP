@@ -3,6 +3,7 @@ import type { FastifyReply } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import compress from '@fastify/compress';
+import rateLimit from '@fastify/rate-limit';
 import { isDomainError } from '../domain/errors';
 
 declare module 'fastify' {
@@ -47,6 +48,13 @@ export const securityPlugin = fp(async (app) => {
     global: true,
     threshold: 1024,
     encodings: ['br', 'gzip'],
+  });
+
+  // ── Rate Limiting ───────────────────────────────────────────
+  await app.register(rateLimit, {
+    max: 60,
+    timeWindow: '1 minute',
+    allowList: ['127.0.0.1', '::1'],
   });
 
   // ── 민감 응답 마킹 헬퍼 ─────────────────────────────────────

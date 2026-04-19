@@ -28,6 +28,9 @@ const schema = z.object({
   MINIO_PUBLIC_ENDPOINT: z.string().min(1).default('localhost'),
   MINIO_PUBLIC_PORT: z.coerce.number().int().positive().default(9000),
   MINIO_PUBLIC_USE_SSL: bool.default(false),
+
+  AUTH_SECRET: z.string().min(32),
+  AUTH_TOKEN_TTL_HOURS: z.coerce.number().int().positive().default(24),
 });
 
 export type Env = z.infer<typeof schema>;
@@ -39,6 +42,7 @@ export class Config {
   readonly logLevel: Env['LOG_LEVEL'];
   readonly trustProxy: boolean;
 
+  readonly auth: Readonly<{ secret: string; tokenTtlHours: number }>;
   readonly cors: Readonly<{ origin: string }>;
   readonly valkey: Readonly<{ url: string }>;
   readonly minio: Readonly<{
@@ -58,6 +62,7 @@ export class Config {
     this.logLevel = env.LOG_LEVEL;
     this.trustProxy = env.TRUST_PROXY;
 
+    this.auth = Object.freeze({ secret: env.AUTH_SECRET, tokenTtlHours: env.AUTH_TOKEN_TTL_HOURS });
     this.cors = Object.freeze({ origin: env.CORS_ORIGIN });
     this.valkey = Object.freeze({ url: env.VALKEY_URL });
     this.minio = Object.freeze({

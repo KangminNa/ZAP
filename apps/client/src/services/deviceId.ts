@@ -1,12 +1,8 @@
 import type { DeviceDto, DeviceTypeDto } from '@zap/shared';
 
-const STORAGE_KEY = 'zap_device_id';
-
-function generateId(): string {
-  const rand = crypto.getRandomValues(new Uint8Array(8));
-  const hex = Array.from(rand, (b) => b.toString(36)).join('');
-  return `dev_${hex}`;
-}
+const TOKEN_KEY = 'zap_device_token';
+const DEVICE_ID_KEY = 'zap_device_id';
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
 function detectType(): DeviceTypeDto {
   const ua = navigator.userAgent;
@@ -32,13 +28,28 @@ function detectName(): string {
   return 'Unknown Device';
 }
 
+export async function ensureDeviceToken(): Promise<void> {
+  if (localStorage.getItem(TOKEN_KEY)) return;
+
+  const res = await fetch(`${BASE_URL}/api/auth/device`, { method: 'POST' });
+  if (!res.ok) throw new Error('failed to register device');
+  const { deviceId, token } = await res.json();
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(DEVICE_ID_KEY, deviceId);
+}
+
+export function getDeviceToken(): string {
+  return localStorage.getItem(TOKEN_KEY) ?? '';
+}
+
+export function setDeviceToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token);
+  const parts = token.split('.');
+  if (parts[0]) localStorage.setItem(DEVICE_ID_KEY, parts[0]);
+}
+
 export function getDeviceId(): string {
-  let id = localStorage.getItem(STORAGE_KEY);
-  if (!id) {
-    id = generateId();
-    localStorage.setItem(STORAGE_KEY, id);
-  }
-  return id;
+  return localStorage.getItem(DEVICE_ID_KEY) ?? '';
 }
 
 export function getDeviceInfo(): DeviceDto {

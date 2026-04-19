@@ -11,6 +11,7 @@ export const CreateSessionRequestSchema = z.object({
   fileCount: z.number().int().positive(),
   ttl: TTLLabelSchema,
   files: z.array(FileMetaSchema).min(1).max(2000),
+  targetDeviceId: z.string().min(1),
 });
 export type CreateSessionRequest = z.infer<typeof CreateSessionRequestSchema>;
 
@@ -18,6 +19,7 @@ export const CreateSessionResponseSchema = z.object({
   sessionId: z.string(),
   presignedUrls: z.array(z.string().url()),
   expiresAt: z.string(),
+  transferToken: z.string(),
 });
 export type CreateSessionResponse = z.infer<typeof CreateSessionResponseSchema>;
 

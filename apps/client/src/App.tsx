@@ -7,7 +7,7 @@ import { ReceiverPanel } from './features/receive/ui/ReceiverCard';
 import { useSendStore } from './features/send/model/sendStore';
 import { useDiscoveryStore } from './features/discovery/model/discoveryStore';
 import { useReceiveStore } from './features/receive/model/receiveStore';
-import { wsClient, api, uploadFiles, createUploadController } from './services';
+import { wsClient, api, uploadFiles, createUploadController, ensureDeviceToken } from './services';
 
 type Tab = 'send' | 'receive';
 
@@ -18,7 +18,7 @@ function useWsConnection() {
   useEffect(() => {
     wsClient.on('device:list', (payload) => setDevices(payload.devices));
     wsClient.on('transfer:ready', (payload) => addTransfer(payload));
-    wsClient.connect();
+    ensureDeviceToken().then(() => wsClient.connect());
     return () => wsClient.disconnect();
   }, [setDevices, addTransfer]);
 }
@@ -33,7 +33,7 @@ function SendView() {
     setSending(true);
 
     try {
-      const res = await api.createSession(store.files, store.ttl);
+      const res = await api.createSession(store.files, store.ttl, selectedDeviceId);
       store.startUpload(res.sessionId, res.presignedUrls);
 
       const controller = createUploadController();

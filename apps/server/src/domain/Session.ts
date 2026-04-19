@@ -23,6 +23,7 @@ export interface SessionSnapshot {
   createdAt: string;
   status: SessionStatus;
   uploadedCount: number;
+  targetDeviceId: string;
   receiverDeviceId: string | null;
 }
 
@@ -34,6 +35,7 @@ export class Session {
     public readonly files: readonly FileSlot[],
     public readonly ttl: TTL,
     public readonly createdAt: Date,
+    public readonly targetDeviceId: string,
     private _status: SessionStatus,
     private _uploadedCount: number,
     private _receiverDeviceId: string | null,
@@ -45,6 +47,7 @@ export class Session {
   static create(input: {
     id: SessionId;
     senderDeviceId: string;
+    targetDeviceId: string;
     networkPrefix: NetworkPrefix;
     files: FileSlot[];
     ttl: TTL;
@@ -60,6 +63,7 @@ export class Session {
       [...input.files],
       input.ttl,
       input.now,
+      input.targetDeviceId,
       'uploading',
       0,
       null,
@@ -75,6 +79,7 @@ export class Session {
       s.files.map((f) => new FileSlot(f.index, f.name, f.size, f.mimeType)),
       TTL.parse(s.ttlLabel),
       new Date(s.createdAt),
+      s.targetDeviceId,
       s.status,
       s.uploadedCount,
       s.receiverDeviceId,
@@ -144,6 +149,7 @@ export class Session {
       createdAt: this.createdAt.toISOString(),
       status: this._status,
       uploadedCount: this._uploadedCount,
+      targetDeviceId: this.targetDeviceId,
       receiverDeviceId: this._receiverDeviceId,
     };
   }
