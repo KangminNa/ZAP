@@ -6,6 +6,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-zap_admin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-zap_secret_change_me}
+      MINIO_CORS_ALLOW_ORIGIN: ${MINIO_CORS_ALLOW_ORIGIN:-http://localhost:5173}
     volumes:
       - minio_data:/data
     ports:
@@ -33,7 +34,9 @@ services:
       mc mb --ignore-existing zap/zap-sessions;
       mc ilm add --expiry-days 1 zap/zap-sessions;
       mc anonymous set download zap/zap-sessions;
-      echo 'MinIO initialized';
+      echo '{\"Version\":\"1\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Action\":[\"s3:PutObject\",\"s3:GetObject\"],\"Resource\":[\"arn:aws:s3:::zap-sessions/*\"]}]}' > /tmp/policy.json;
+      mc anonymous set-json /tmp/policy.json zap/zap-sessions;
+      echo 'MinIO initialized with CORS + policy';
       "
     restart: on-failure
 
