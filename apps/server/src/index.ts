@@ -18,6 +18,7 @@ const app = Fastify({
     ? { level: config.logLevel }
     : { level: config.logLevel, transport: { target: 'pino-pretty' } },
   trustProxy: config.trustProxy,
+  bodyLimit: 2 * 1024 * 1024,
 });
 
 app.decorate('config', config);

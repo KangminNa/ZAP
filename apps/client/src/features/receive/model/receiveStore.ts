@@ -18,6 +18,7 @@ interface ReceiveState {
   acceptTransfer: (sessionId: string, urls: string[]) => void;
   declineTransfer: (sessionId: string) => void;
   markDone: (sessionId: string) => void;
+  prune: () => void;
 }
 
 export const useReceiveStore = create<ReceiveState>((set) => ({
@@ -49,5 +50,13 @@ export const useReceiveStore = create<ReceiveState>((set) => ({
       transfers: s.transfers.map((t) =>
         t.sessionId === sessionId ? { ...t, status: 'done' as const } : t,
       ),
+    })),
+
+  prune: () =>
+    set((s) => ({
+      transfers: s.transfers.filter((t) => {
+        if (t.status === 'done' || t.status === 'declined') return false;
+        return new Date(t.expiresAt).getTime() > Date.now();
+      }),
     })),
 }));

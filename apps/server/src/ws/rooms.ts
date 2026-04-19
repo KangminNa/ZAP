@@ -11,14 +11,21 @@ export class Rooms {
   private readonly byNetwork = new Map<string, Map<string, ConnectedDevice>>();
   private readonly deviceNetwork = new Map<string, string>();
 
-  join(networkPrefix: string, device: DeviceDto, ws: WebSocket): void {
+  join(networkPrefix: string, device: DeviceDto, ws: WebSocket): boolean {
     let room = this.byNetwork.get(networkPrefix);
     if (!room) {
       room = new Map();
       this.byNetwork.set(networkPrefix, room);
     }
+
+    const existing = room.get(device.id);
+    if (existing && existing.ws.readyState === 1 && existing.ws !== ws) {
+      return false;
+    }
+
     room.set(device.id, { ws, device, networkPrefix });
     this.deviceNetwork.set(device.id, networkPrefix);
+    return true;
   }
 
   leave(deviceId: string): void {

@@ -45,6 +45,15 @@ class WsClient {
     this.setStatus('connecting');
 
     try {
+      if (this.ws) {
+        this.ws.onopen = null;
+        this.ws.onclose = null;
+        this.ws.onerror = null;
+        this.ws.onmessage = null;
+        try { this.ws.close(); } catch {}
+        this.ws = null;
+      }
+
       console.log('[ZAP] getting WS ticket...');
       const ticket = await api.getWsTicket();
       console.log('[ZAP] connecting WS to', WS_URL);
@@ -103,8 +112,15 @@ class WsClient {
 
   disconnect(): void {
     this.shouldReconnect = false;
-    this.ws?.close();
-    this.ws = null;
+    this.backoff = 1000;
+    if (this.ws) {
+      this.ws.onopen = null;
+      this.ws.onclose = null;
+      this.ws.onerror = null;
+      this.ws.onmessage = null;
+      try { this.ws.close(); } catch {}
+      this.ws = null;
+    }
     this.setStatus('disconnected');
   }
 

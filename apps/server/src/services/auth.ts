@@ -1,4 +1,4 @@
-import { createHmac, randomBytes } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 function hmac(data: string, secret: string): string {
   return createHmac('sha256', secret).update(data).digest('hex');
@@ -31,7 +31,9 @@ export function verifyDeviceToken(
   if (!deviceId || !issuedAt || isNaN(issuedAt)) return { valid: false };
 
   const expected = hmac(`${deviceId}.${issuedAtStr}`, secret);
-  if (sig !== expected) return { valid: false };
+  if (sig.length !== expected.length || !timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+    return { valid: false };
+  }
 
   const age = Date.now() / 1000 - issuedAt;
   if (age > ttlHours * 3600) return { valid: false };
@@ -76,5 +78,6 @@ export function verifyTransferToken(
   secret: string,
 ): boolean {
   const expected = hmac(`${sessionId}:${callerDeviceId}`, secret);
-  return token === expected;
+  if (token.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(token), Buffer.from(expected));
 }

@@ -140,6 +140,7 @@ function MainApp() {
   const [tab, setTab] = useState<Tab>('send');
   const setDevices = useDiscoveryStore((s) => s.setDevices);
   const addTransfer = useReceiveStore((s) => s.addTransfer);
+  const prune = useReceiveStore((s) => s.prune);
   const [connStatus, setConnStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
 
   useEffect(() => {
@@ -149,11 +150,13 @@ function MainApp() {
     ensureDeviceToken()
       .then(() => wsClient.connect())
       .catch((err) => console.error('[ZAP] connection failed:', err));
+    const pruneInterval = setInterval(prune, 60_000);
     return () => {
       unsub();
+      clearInterval(pruneInterval);
       wsClient.disconnect();
     };
-  }, [setDevices, addTransfer]);
+  }, [setDevices, addTransfer, prune]);
 
   return (
     <div className="min-h-screen bg-stone-100">

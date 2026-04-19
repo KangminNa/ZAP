@@ -53,7 +53,7 @@ export async function ensureDeviceToken(): Promise<void> {
     }
     const issuedAt = Number(parts[1]);
     const ageHours = (Date.now() / 1000 - issuedAt) / 3600;
-    if (ageHours > 20) {
+    if (ageHours > 12) {
       throw new Error('token too old');
     }
     console.log('[ZAP] existing token valid, age:', Math.round(ageHours * 10) / 10, 'h');
