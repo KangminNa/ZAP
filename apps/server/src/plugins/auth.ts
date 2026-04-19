@@ -13,7 +13,7 @@ export const authPlugin = fp(async (app) => {
   app.addHook('onRequest', async (req, reply) => {
     const path = req.url.split('?')[0];
 
-    if (path === '/health' || path === '/api/auth/device') return;
+    if (path === '/health' || path === '/api/auth/device' || path === '/ws') return;
 
     const header = req.headers.authorization;
     if (!header?.startsWith('Bearer ')) {

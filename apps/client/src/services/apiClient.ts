@@ -4,9 +4,9 @@ import type {
   TTLLabel,
   DomainErrorCode,
 } from '@zap/shared';
-import { getDeviceToken, setDeviceToken } from './deviceId';
+import { getDeviceToken, setDeviceToken, ensureDeviceToken } from './deviceId';
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
 export class ApiError extends Error {
   constructor(
@@ -22,18 +22,25 @@ export class ApiError extends Error {
 async function request<T>(
   path: string,
   init?: RequestInit,
+  _retried = false,
 ): Promise<T> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${getDeviceToken()}`,
+  };
+  if (init?.body) headers['Content-Type'] = 'application/json';
+
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${getDeviceToken()}`,
-      ...init?.headers,
-    },
+    headers: { ...headers, ...(init?.headers as Record<string, string>) },
   });
 
   const refreshed = res.headers.get('X-Device-Token-Refresh');
   if (refreshed) setDeviceToken(refreshed);
+
+  if (res.status === 401 && !_retried) {
+    await ensureDeviceToken();
+    return request(path, init, true);
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

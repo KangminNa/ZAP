@@ -19,7 +19,10 @@ function TransferCard({ transfer }: { transfer: IncomingTransfer }) {
   const { sender, fileCount, totalSize, expiresAt, status, sessionId } = transfer;
 
   const handleAccept = () => {
-    wsClient.send({ event: 'transfer:accept', payload: { sessionId } });
+    wsClient.send({
+      event: 'transfer:accept',
+      payload: { sessionId, transferToken: transfer.transferToken },
+    } as never);
   };
 
   const handleDecline = () => {

@@ -7,6 +7,7 @@ export interface IncomingTransfer {
   fileCount: number;
   totalSize: number;
   expiresAt: string;
+  transferToken?: string;
   status: 'pending' | 'accepted' | 'declined' | 'downloading' | 'done';
   presignedUrls?: string[];
 }

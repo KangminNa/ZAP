@@ -85,9 +85,10 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
             fileCount: session.files.length,
             totalSize: session.totalSize,
             expiresAt: session.expiresAt.toISOString(),
+            transferToken,
           },
-        });
-        app.log.info({ sessionId: id, transferToken }, 'session ready');
+        } as never);
+        app.log.info({ sessionId: id }, 'session ready, notified receiver');
       }
 
       return reply.send({

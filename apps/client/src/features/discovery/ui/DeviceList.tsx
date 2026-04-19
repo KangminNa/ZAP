@@ -1,6 +1,7 @@
 import type { DeviceDto } from '@zap/shared';
 import { Avatar } from '../../../shared/ui/Avatar';
 import { useDiscoveryStore } from '../model/discoveryStore';
+import { getDeviceId } from '../../../services';
 
 const TYPE_LABEL: Record<string, string> = {
   mac: 'Mac',
@@ -41,7 +42,9 @@ function DeviceCard({ device }: { device: DeviceDto }) {
 }
 
 export function DeviceList() {
-  const devices = useDiscoveryStore((s) => s.devices);
+  const allDevices = useDiscoveryStore((s) => s.devices);
+  const myId = getDeviceId();
+  const devices = allDevices.filter((d) => d.id !== myId);
 
   return (
     <div className="space-y-2">
