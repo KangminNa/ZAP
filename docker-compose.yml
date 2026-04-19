@@ -7,6 +7,9 @@ services:
     container_name: zap-client
     ports:
       - "${CLIENT_PORT:-3080}:80"
+    networks:
+      - default
+      - npm
     restart: unless-stopped
 
   # ── 백엔드 (Fastify + WebSocket) ───────────────────────────
@@ -24,7 +27,7 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOST: 0.0.0.0
-      LOG_LEVEL: info
+      LOG_LEVEL: ${LOG_LEVEL:-info}
       TRUST_PROXY: "true"
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
       VALKEY_URL: redis://valkey:6379
@@ -40,6 +43,9 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required}
     ports:
       - "${SERVER_PORT:-3000}:3000"
+    networks:
+      - default
+      - npm
     restart: unless-stopped
 
   # ── MinIO (오브젝트 스토리지) ───────────────────────────────
@@ -61,6 +67,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - default
+      - npm
     restart: unless-stopped
 
   # ── MinIO 초기화 ─────────────────────────────────────────────
@@ -81,6 +90,8 @@ services:
       mc anonymous set none zap/zap-sessions;
       echo 'MinIO initialized';
       "
+    networks:
+      - default
     restart: on-failure
 
   # ── Valkey (세션 캐시) ────────────────────────────────────────
@@ -97,7 +108,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - default
     restart: unless-stopped
+
+networks:
+  npm:
+    external: true
+    name: ${NPM_NETWORK:-npm_default}
 
 volumes:
   minio_data:
